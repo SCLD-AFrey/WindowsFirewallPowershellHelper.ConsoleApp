@@ -2,20 +2,26 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using WindowsFirewallPowershellHelper;
+using DevExpress.Xpo;
+using DevExpress.Xpo.DB;
+using WindowsFirewallHelper.Data;
 
 namespace WindowsFirewallPowershellHelper.ConsoleApp
 {
     class Program
     {
-        List<FirewallRule> ruleCollection = new List<FirewallRule>();
         static async Task Main(string[] args)
         {
-            await FirewallRuleUtilities.GetTestScript();
+
+            await Utilities.SetExecutionPolicy();
             //await GetProfiles();
-            //await GetRules();
+            //await GetProfiles();
+            //await GetRules(false);
+            await GetRules(true);
 
 
 
@@ -28,7 +34,7 @@ namespace WindowsFirewallPowershellHelper.ConsoleApp
         {
             var t = new Stopwatch();
             t.Start();
-            await Utilities.SetExecutionPolicy();
+
             var profileCollection = await WindowsFirewallPowershellHelper.FirewallRuleUtilities.GetFirewallProfile();
 
 
@@ -42,44 +48,40 @@ namespace WindowsFirewallPowershellHelper.ConsoleApp
             Console.WriteLine($@"{profileCollection.Count.ToString()} profiles : elapsed {t.Elapsed}");
         }
 
-        static async Task GetRules()
+        static async Task GetRules(bool GetExt)
         {
+            var port = 5050;
             var t = new Stopwatch();
             t.Start();
 
-            await Utilities.SetExecutionPolicy();
-            var ruleCollection = await FirewallRuleUtilities.GetFirewallRule(
-                pWildcard: "TEST",
-                pDirection: Enumerations.Direction.Any
+            //var firewallRuleCollection = await FirewallRuleUtilities.GetFirewallRule(
+            //    pWildcard: "TEST",
+            //    pDirection: Enumerations.Direction.Any,
+            //    GetExtendedProps: GetExt
+            //);
+
+            var firewallRuleCollection = await FirewallRuleUtilities.GetFirewallRule(
+                pDisplayName: "TEST - Complex",
+                pDirection: Enumerations.Direction.Any,
+                GetExtendedProps: GetExt
             );
 
-            var ruleExtCollection = new ObservableCollection<FirewallRule>();
-            var taskList = new List<Task<FirewallRule>>();
 
-            int i = 0;
-            foreach (var rule in ruleCollection)
+
+
+            var portCollection = firewallRuleCollection.FindByPort(port);
+            var addressCollection = firewallRuleCollection.FindByAddress("127.0.0.1");
+
+
+            foreach (var rule in portCollection)
             {
-                i++;
-                Task<FirewallRule> task = Task.Run(async () => await FirewallRuleUtilities.GetRuleExt(rule));
-                taskList.Add(task);
-
-                if (i == 25 || taskList.Count == ruleCollection.Count)
-                {
-                    Task.WaitAll(taskList.ToArray());
-
-                    foreach (var cTask in taskList)
-                    {
-                        Console.WriteLine($@"{cTask.Result.BuildScript}");
-                        ruleExtCollection.Add(cTask.Result);
-                    }
-                    i = 0;
-                    taskList = new List<Task<FirewallRule>>();
-                }
+                Console.WriteLine($@"{rule.DisplayName} port {port}");
             }
 
             t.Stop();
 
-            Console.WriteLine($@"{ruleCollection.Count.ToString()} rules : elapsed {t.Elapsed}");
+            Console.WriteLine($@"-----------------------");
+            Console.WriteLine($@"{firewallRuleCollection.Count} Rules returned in {t.Elapsed} ms");
         }
 
     }
